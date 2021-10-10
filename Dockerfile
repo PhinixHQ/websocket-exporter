@@ -1,7 +1,4 @@
-FROM golang:1.16-alpine as builder
-
-ENV port 9143
-EXPOSE $port
+FROM golang:1.16-alpine 
 
 WORKDIR /
 
@@ -12,14 +9,12 @@ RUN go mod download
 
 RUN go build -o /websocket-exporter
 
-CMD [ "/websocket-exporter" ]
-
 
 FROM alpine:3.14 as production
 
 ENV port 9143
 
-COPY --from=builder websocket-exporter .
+COPY --from=0 websocket-exporter .
 
 EXPOSE $port
 
