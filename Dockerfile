@@ -5,7 +5,7 @@ WORKDIR /
 COPY *.go ./
 COPY go.* ./
 
-RUN go mod download
+RUN go get
 
 RUN go build -o /websocket-exporter
 
