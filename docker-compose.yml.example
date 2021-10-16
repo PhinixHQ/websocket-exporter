@@ -5,4 +5,5 @@ services:
     restart: unless-stopped
     environment: 
       port: "9143"
+      timeout: "5"
     network_mode: "host"
