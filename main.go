@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -31,7 +32,9 @@ var (
 	err_read  error
 )
 
-func probeHandler(w http.ResponseWriter, r *http.Request) {
+func probeHandler(w http.ResponseWriter, r *http.Request, t int) {
+	
+	websocket.DefaultDialer.HandshakeTimeout = time.Duration(t) * time.Second
 
 	targets, tr_ok := r.URL.Query()["target"]
 	transports, tp_ok := r.URL.Query()["transport"]
@@ -93,13 +96,14 @@ func probeHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	Port := flag.Int("port", 9143, "Port Number to listen")
+	TimeOut := flag.Int("timeout", 1, "HandshakeTimeout specifies the duration for the handshake to complete")
 	flag.Parse()
 	var port = ":" + strconv.Itoa(*Port)
 
 	fmt.Print("exporter working on port", port)
 
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
-		probeHandler(w, r)
+		probeHandler(w, r, *TimeOut)
 	})
 
 	http.ListenAndServe(port, nil)
