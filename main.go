@@ -27,14 +27,19 @@ var (
 			Help: "( 101 is normal status code )",
 		})
 
+	websocket_response_time = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "websocket_response_time",
+			Help: "( response time in second )",
+		})
 	transport string
 	resp_code float64
 	err_read  error
 )
 
-func probeHandler(w http.ResponseWriter, r *http.Request, t int) {
-	
-	websocket.DefaultDialer.HandshakeTimeout = time.Duration(t) * time.Second
+func probeHandler(w http.ResponseWriter, r *http.Request, TimeOutHandshake int) {
+
+	websocket.DefaultDialer.HandshakeTimeout = time.Duration(TimeOutHandshake) * time.Second
 
 	targets, tr_ok := r.URL.Query()["target"]
 	transports, tp_ok := r.URL.Query()["transport"]
@@ -57,9 +62,15 @@ func probeHandler(w http.ResponseWriter, r *http.Request, t int) {
 
 	u := url.URL{Scheme: ur.Scheme, Host: ur.Host, Path: ur.Path, RawQuery: ur.RawQuery}
 
+	start := time.Now()
+
 	c, resp, err_con := websocket.DefaultDialer.Dial(u.String(), nil)
 
-	if resp != nil {
+	if err_con == nil {
+		c.UnderlyingConn().SetDeadline(time.Now().Add(time.Duration(0) * time.Second))
+	}
+
+	if err_con == nil && resp != nil {
 		resp_code = float64(resp.StatusCode)
 	} else {
 		resp_code = 0
@@ -85,9 +96,13 @@ func probeHandler(w http.ResponseWriter, r *http.Request, t int) {
 		c.Close()
 	}
 
+	elapsed := time.Since(start).Seconds()
+	websocket_response_time.Set(elapsed)
+
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(websocket_successful)
 	reg.MustRegister(websocket_status_code)
+	reg.MustRegister(websocket_response_time)
 
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	h.ServeHTTP(w, r)
@@ -96,14 +111,15 @@ func probeHandler(w http.ResponseWriter, r *http.Request, t int) {
 func main() {
 
 	Port := flag.Int("port", 9143, "Port Number to listen")
-	TimeOut := flag.Int("timeout", 1, "HandshakeTimeout specifies the duration for the handshake to complete")
+	TimeOutHandshake := flag.Int("timeout", 5, "HandshakeTimeout specifies the duration for the handshake to complete")
+
 	flag.Parse()
 	var port = ":" + strconv.Itoa(*Port)
 
-	fmt.Print("exporter working on port", port)
+	fmt.Println("exporter working on port", port)
 
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
-		probeHandler(w, r, *TimeOut)
+		probeHandler(w, r, *TimeOutHandshake)
 	})
 
 	http.ListenAndServe(port, nil)
